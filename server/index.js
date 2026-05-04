@@ -7,7 +7,6 @@ import * as db from './db.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
-// 强制监听 0.0.0.0 以确保在容器环境下可被外部访问
 const HOST = '0.0.0.0'
 const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'canteen-admin'
 const DEV_PASSCODE = process.env.DEV_PASSCODE || 'dev-mode'
@@ -15,41 +14,39 @@ const DEV_PASSCODE = process.env.DEV_PASSCODE || 'dev-mode'
 app.use(cors())
 app.use(express.json())
 
-// 生产环境下托管前端静态文件
-const __filename = fileURLToPath(import.meta.url)
-const serverDir = dirname(__filename)
-const distPath = join(serverDir, '../dist')
+// 获取静态文件目录
+const currentFile = fileURLToPath(import.meta.url)
+const currentDir = dirname(currentFile)
+const staticAssetsPath = join(currentDir, '../dist')
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(distPath))
+// 1. 静态文件托管 (仅在生产环境且目录存在时)
+if (process.env.NODE_ENV === 'production' && existsSync(staticAssetsPath)) {
+  app.use(express.static(staticAssetsPath))
 }
 
-// 根路径处理
+// 2. 根路径逻辑
 app.get('/', (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    res.sendFile(join(distPath, 'index.html'))
+  const indexFile = join(staticAssetsPath, 'index.html')
+  if (process.env.NODE_ENV === 'production' && existsSync(indexFile)) {
+    res.sendFile(indexFile)
   } else {
-    res.send('🍚 食堂点评系统后端 API 已启动。请通过前端页面 (通常是 5173 端口) 访问系统。')
+    res.send('🍚 食堂点评 API 已启动')
   }
 })
 
-const getIP = req =>
-  req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || '0.0.0.0'
-
+// 工具函数
+const getIP = req => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || '0.0.0.0'
 const ok = (res, data) => res.json({ ok: true, ...data })
 const fail = (res, msg, code = 400) => res.status(code).json({ ok: false, error: msg })
 
-app.get('/api/notice', (req, res) => {
-  ok(res, { notice: db.getActiveNotice() })
-})
-
-app.get('/api/config', (req, res) => {
-  ok(res, {
-    site_name: db.getConfig('site_name') || '食堂点评',
-    site_subtitle: db.getConfig('site_subtitle') || '让每一餐都被听见',
-    allow_anonymous: db.getConfig('allow_anonymous') !== 'false'
-  })
-})
+// --- API 接口 ---
+app.get('/api/notice', (req, res) => ok(res, { notice: db.getActiveNotice() }))
+app.get('/api/config', (req, res) => ok(res, {
+  ok: true,
+  site_name: db.getConfig('site_name') || '食堂点评',
+  site_subtitle: db.getConfig('site_subtitle') || '让每一餐都被听见',
+  allow_anonymous: db.getConfig('allow_anonymous') !== 'false'
+}))
 
 app.get('/api/ranking', (req, res) => {
   const { stall } = req.query
@@ -73,8 +70,7 @@ app.get('/api/ratings/student', (req, res) => {
 
 app.post('/api/ratings', (req, res) => {
   const { dish_name, stall, score, comment, student_id } = req.body
-  if (!dish_name?.trim()) return fail(res, '请填写菜品名称')
-  if (!stall?.trim()) return fail(res, '请填写档口名称')
+  if (!dish_name?.trim() || !stall?.trim()) return fail(res, '请填写菜名和档口')
   if (!score || score < 1 || score > 5) return fail(res, '评分需在 1-5 之间')
   db.addRating({ dish_name: dish_name.trim(), stall: stall.trim(), score, comment, student_id, ip: getIP(req) })
   ok(res, { message: '评分成功！' })
@@ -93,17 +89,16 @@ app.get('/api/feedbacks/public', (req, res) => {
   ok(res, { feedbacks: all })
 })
 
+// 管理员权限校验
 const adminAuth = (req, res, next) => {
   const passcode = req.headers['x-passcode'] || req.query.passcode
   if (passcode !== ADMIN_PASSCODE && passcode !== DEV_PASSCODE) return fail(res, '口令错误', 401)
-  req.isDev = passcode === DEV_PASSCODE
   next()
 }
 
 app.post('/api/admin/auth', (req, res) => {
   const { passcode } = req.body
   if (passcode === ADMIN_PASSCODE) return ok(res, { role: 'admin' })
-  if (passcode === DEV_PASSCODE) return ok(res, { role: 'dev' })
   fail(res, '口令错误', 401)
 })
 
@@ -112,14 +107,12 @@ app.get('/api/admin/ratings', adminAuth, (req, res) => {
 })
 
 app.patch('/api/admin/ratings/:id', adminAuth, (req, res) => {
-  const { status } = req.body
-  db.setRatingStatus(Number(req.params.id), status)
+  db.setRatingStatus(Number(req.params.id), req.body.status)
   ok(res, { message: '已更新' })
 })
 
 app.get('/api/admin/feedbacks', adminAuth, (req, res) => {
-  const { status } = req.query
-  ok(res, { feedbacks: db.getFeedbacks(status) })
+  ok(res, { feedbacks: db.getFeedbacks(req.query.status) })
 })
 
 app.patch('/api/admin/feedbacks/:id/reply', adminAuth, (req, res) => {
@@ -130,8 +123,7 @@ app.patch('/api/admin/feedbacks/:id/reply', adminAuth, (req, res) => {
 })
 
 app.patch('/api/admin/feedbacks/:id', adminAuth, (req, res) => {
-  const { status } = req.body
-  db.setFeedbackStatus(Number(req.params.id), status)
+  db.setFeedbackStatus(Number(req.params.id), req.body.status)
   ok(res, { message: '已更新' })
 })
 
@@ -147,13 +139,16 @@ app.patch('/api/admin/notices/:id', adminAuth, (req, res) => {
   ok(res, { message: '已更新' })
 })
 
-const distPath = join(__dirname, '../dist')
-if (existsSync(distPath)) {
-  app.use(express.static(distPath))
-  app.get('*', (req, res) => res.sendFile(join(distPath, 'index.html')))
-}
+// 5. SPA 路由支持 (万能匹配)
+app.get('*', (req, res) => {
+  const indexFile = join(staticAssetsPath, 'index.html')
+  if (process.env.NODE_ENV === 'production' && existsSync(indexFile)) {
+    res.sendFile(indexFile)
+  } else {
+    res.status(404).send('页面不存在')
+  }
+})
 
 app.listen(PORT, HOST, () => {
-  console.log(`🍚 食堂点评后端运行于 http://${HOST}:${PORT}`)
-  console.log(`   管理员口令: ${ADMIN_PASSCODE}`)
+  console.log(`🍚 Server running on http://${HOST}:${PORT}`)
 })
