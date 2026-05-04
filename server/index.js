@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url'
 import { existsSync } from 'fs'
 import * as db from './db.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3001
 // 强制监听 0.0.0.0 以确保在容器环境下可被外部访问
@@ -18,8 +17,8 @@ app.use(express.json())
 
 // 生产环境下托管前端静态文件
 const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const distPath = join(__dirname, '../dist')
+const serverDir = dirname(__filename)
+const distPath = join(serverDir, '../dist')
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath))
