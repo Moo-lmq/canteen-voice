@@ -1,0 +1,28 @@
+{
+  "name": "canteen-voice",
+  "version": "1.0.0",
+  "description": "校园食堂菜品评分与意见管理系统",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node --watch server/index.js",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "cors": "^2.8.5",
+    "axios": "^1.7.7",
+    "lucide-react": "^0.441.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.26.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "vite": "^5.4.2"
+  }
+}

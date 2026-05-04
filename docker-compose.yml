@@ -1,0 +1,14 @@
+services:
+  canteen-app:
+    build: .
+    container_name: canteen-voice-container
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - ADMIN_PASSCODE=canteen-admin
+      - DEV_PASSCODE=dev-mode
+      - SQLITE_FILE=/app/data/canteen.db
+    volumes:
+      - ./data:/app/data
+    restart: always
