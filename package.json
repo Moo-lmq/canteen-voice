@@ -1,6 +1,6 @@
 {
   "name": "canteen-voice",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "校园食堂菜品评分与意见管理系统",
   "type": "module",
   "scripts": {
