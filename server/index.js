@@ -1,4 +1,4 @@
-﻿import express from 'express'
+import express from 'express'
 import cors from 'cors'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -8,15 +8,30 @@ import * as db from './db.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3001
+// 强制监听 0.0.0.0 以确保在容器环境下可被外部访问
+const HOST = '0.0.0.0'
 const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || 'canteen-admin'
 const DEV_PASSCODE = process.env.DEV_PASSCODE || 'dev-mode'
 
 app.use(cors())
 app.use(express.json())
 
-// 根路径处理，防止直接访问 3001 端口时显示错误
+// 生产环境下托管前端静态文件
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const distPath = join(__dirname, '../dist')
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(distPath))
+}
+
+// 根路径处理
 app.get('/', (req, res) => {
-  res.send('🍚 食堂点评系统后端 API 已启动。请通过前端页面 (通常是 5173 端口) 访问系统。')
+  if (process.env.NODE_ENV === 'production') {
+    res.sendFile(join(distPath, 'index.html'))
+  } else {
+    res.send('🍚 食堂点评系统后端 API 已启动。请通过前端页面 (通常是 5173 端口) 访问系统。')
+  }
 })
 
 const getIP = req =>
@@ -139,7 +154,7 @@ if (existsSync(distPath)) {
   app.get('*', (req, res) => res.sendFile(join(distPath, 'index.html')))
 }
 
-app.listen(PORT, () => {
-  console.log(`🍚 食堂点评后端运行于 http://localhost:${PORT}`)
+app.listen(PORT, HOST, () => {
+  console.log(`🍚 食堂点评后端运行于 http://${HOST}:${PORT}`)
   console.log(`   管理员口令: ${ADMIN_PASSCODE}`)
 })
